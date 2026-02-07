@@ -1,3 +1,12 @@
+# --- Data files (raw imports) ---
+data/raw/
+*.geojson
+*.gpkg
+*.shp
+*.dbf
+*.prj
+*.shx
+
 ############################
 # Python / FastAPI
 ############################
