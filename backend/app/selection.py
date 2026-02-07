@@ -1,6 +1,9 @@
 import math
 from typing import List, Dict, Optional
+from geopy.geocoders import Nominatim
 
+
+_geolocator = Nominatim(user_agent="my_building_finder_v1", timeout=5)
 
 # ---------- geometry helpers ----------
 
@@ -80,18 +83,18 @@ def pick_house(
     return best
 
 
-houses = [
-  {"house_id": "A", "lat": 43.2500, "lon": -79.8700},
-  {"house_id": "B", "lat": 43.2510, "lon": -79.8690},
-]
+def get_building_name_free(lat: float, lon: float):
+    try:
+        location = _geolocator.reverse(f"{lat}, {lon}", zoom=18, addressdetails=True)
+        if not location:
+            return {"display_name": None, "address": {}}
 
-best = pick_house(
-  user_lat=43.25,
-  user_lon=-79.87,
-  heading_deg=40,
-  houses=houses,
-  radius_m=150,
-  cone_deg=60,
-)
-
-print(best)
+        raw = location.raw
+        return {
+            "display_name": raw.get("display_name"),
+            "address": raw.get("address", {}),
+            "osm_type": raw.get("osm_type"),
+            "osm_id": raw.get("osm_id"),
+        }
+    except Exception as e:
+        return {"error": str(e), "display_name": None, "address": {}}
