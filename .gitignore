@@ -1,31 +1,101 @@
-# --- Environment / secrets ---
-.env
-.env.*
-*.env
+############################
+# Python / FastAPI
+############################
 
-# --- Data files (raw imports) ---
-data/raw/
-*.geojson
-*.gpkg
-*.shp
-*.dbf
-*.prj
-*.shx
-
-# --- Python ---
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-.venv/
+*$py.class
+
+# Virtual environments
 venv/
+.env/
+.venv/
+ENV/
 env/
 
-# --- OS / editor ---
-.DS_Store
-Thumbs.db
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Type checkers
+.mypy_cache/
+.pyre/
+.pytype/
+
+# Logs
+*.log
+
+############################
+# Environment / Secrets
+############################
+
+.env
+.env.*
+secrets.json
+config.local.py
+
+############################
+# Database
+############################
+
+*.db
+*.sqlite3
+
+############################
+# Uvicorn / FastAPI runtime
+############################
+
+*.pid
+*.sock
+
+############################
+# Node / React / Next.js (if frontend in same repo)
+############################
+
+node_modules/
+.next/
+out/
+build/
+dist/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+############################
+# IDE / Editor
+############################
+
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# --- Logs ---
-*.log
+############################
+# OS files
+############################
+
+.DS_Store
+Thumbs.db
+
+############################
+# Docker
+############################
+
+docker-compose.override.yml
+
+############################
+# Misc
+############################
+
+*.bak
+*.tmp
