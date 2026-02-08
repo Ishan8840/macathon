@@ -49,8 +49,8 @@ def pick_house(
     best_score = -1.0
 
     for h in houses:
-        lat2 = float(h["lat"])
-        lon2 = float(h["lon"])
+        lat2 = float(h["centroid_lat"])
+        lon2 = float(h["centroid_lon"])
 
         dist = haversine_m(user_lat, user_lon, lat2, lon2)
         if dist <= 1.0 or dist > radius_m:
@@ -71,13 +71,8 @@ def pick_house(
         if score > best_score:
             best_score = score
             best = {
-                "house_id": h["house_id"],
                 "lat": lat2,
                 "lon": lon2,
-                "bearing_deg": bearing,
-                "delta_deg": delta,
-                "distance_m": dist,
-                "confidence": round(score, 3),
             }
 
     return best

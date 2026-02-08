@@ -8,7 +8,7 @@ client = genai.Client(
     api_key=os.environ["GEMINI_API_KEY"],
 )
 
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-2.5-flash-lite"
 
 def generate_summary(location: dict):
     prompt = prompt = f"""
@@ -59,6 +59,6 @@ def generate_summary(location: dict):
     config={"response_mime_type": "application/json"},
     )
 
-    text = "".join(chunk.text for chunk in response if getattr(chunk, "text", None))
+    text = "".join(chunk.text for chunk in response if getattr(chunk, "text", None)).strip()
 
-    return text
+    return json.loads(text)

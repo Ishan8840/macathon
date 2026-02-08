@@ -5,7 +5,12 @@ import time
 from .models import IdentifyResponse, BuildingOut, LatLon, Meta
 from .selection import pick_house, get_building_name_free
 from .gemini_client import generate_summary
+from .radius import get_buildings_within_radius
+from contextlib import asynccontextmanager
+import asyncpg
+import os
 
+DATABASE_URL = os.environ["SUPABASE_DB_URL"]   
 
 app = FastAPI()
 
@@ -19,7 +24,6 @@ app.add_middleware(
 DEFAULT_RADIUS_M = 150
 DEFAULT_CONE_DEG = 60
 
-
 def fetch_houses_in_radius(lat: float, lon: float, radius_m: int) -> List[Dict]:
     # must return: {house_id, lat, lon}
     return [
@@ -27,8 +31,6 @@ def fetch_houses_in_radius(lat: float, lon: float, radius_m: int) -> List[Dict]:
         {"house_id": "B", "lat": lat + 0.0010, "lon": lon + 0.0009},
         {"house_id": "C", "lat": lat - 0.0006, "lon": lon + 0.0001},
     ]
-
-
 
 @app.get("/identify", response_model=IdentifyResponse)
 def identify(
@@ -97,3 +99,23 @@ def building(lat: float, lon: float):
 @app.get("/health")
 def health():
     return {"ok": True}
+
+@app.get("/buildings/nearby")
+async def buildings_nearby(
+    lat: float,
+    lng: float,
+    heading_deg: float,
+    radius_m: float = 100.0,
+):
+    try:
+        buildings = await get_buildings_within_radius(
+            user_lat=lat,
+            user_lng=lng,
+            heading_deg=heading_deg,
+            radius_m=radius_m,
+        )
+        house = pick_house(lat, lng, heading_deg, buildings, radius_m)
+        print(house)
+        return house
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
