@@ -63,37 +63,82 @@ const FullscreenCamera = () => {
   // 📸 Start rear camera
   const streamRef = useRef(null);
 
-  useEffect(() => {
-    if (!isStarted) return;
+useEffect(() => {
+  if (!isStarted) return;
 
-    let cancelled = false;
+  let cancelled = false;
 
-    (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach(t => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      } catch (e) {
-        console.error("Camera error:", e);
+  const stopStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  };
+
+  const startStream = async () => {
+    try {
+      stopStream();
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+
+      if (cancelled) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
       }
-    })();
 
-    return () => {
-      cancelled = true;
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
+      streamRef.current = stream;
+
+      const video = videoRef.current;
+      if (!video) return;
+
+      video.srcObject = stream;
+
+      // iOS sometimes needs these explicitly
+      video.setAttribute("playsinline", "true");
+      video.muted = true;
+
+      // Start playback
+      await video.play().catch((e) => {
+        console.log("video.play() failed:", e);
+      });
+
+      // Restart if track ends (common on iOS when something interrupts)
+      const [track] = stream.getVideoTracks();
+      if (track) {
+        track.onended = () => {
+          console.log("TRACK ended → restarting camera");
+          startStream();
+        };
       }
-    };
-  }, [isStarted]);
+
+      // Optional debug:
+      // attachDebug(video, stream);
+
+    } catch (e) {
+      console.error("Camera error:", e);
+    }
+  };
+
+  const onVisibility = () => {
+    // When user switches tabs / permissions prompt / etc.
+    if (document.visibilityState === "visible") {
+      console.log("Tab visible → ensure camera playing");
+      startStream();
+    }
+  };
+
+  startStream();
+  document.addEventListener("visibilitychange", onVisibility);
+
+  return () => {
+    cancelled = true;
+    document.removeEventListener("visibilitychange", onVisibility);
+    stopStream();
+  };
+}, [isStarted]);
 
 
   // 📍 Geolocation updates
@@ -324,8 +369,6 @@ const FullscreenCamera = () => {
               🏠
             </button>
           )}
-
-          <div className={still ? "showing" : "hidden"}>STILL!</div> {/*TESSTTTTTT!!!!!!!!!!!!!!!!!!!!!!! */}
 
           {/* 🪧 Property Info Panel - Slide Up */}
                     {showInfo && (
