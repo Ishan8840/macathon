@@ -4,6 +4,8 @@ import "./Camera.css"
 const FullscreenCamera = () => {
   const videoRef = useRef(null);
   const [isStarted, setIsStarted] = useState(false);
+  const [hasGpsFix, setHasGpsFix] = useState(false);
+  const [hasOrientationFix, setHasOrientationFix] = useState(false);
 
   const [coords, setCoords] = useState({
     latitude: null,
@@ -81,6 +83,8 @@ const FullscreenCamera = () => {
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
+        setHasGpsFix(true); // ✅ we now have GPS data at least once
+
         setCoords({
           latitude: position.coords.latitude,   // ✅ keep as number
           longitude: position.coords.longitude, // ✅ keep as number
@@ -88,11 +92,9 @@ const FullscreenCamera = () => {
           timestamp: position.timestamp,
         });
       },
-      (err) => console.error("Geolocation error:", err),
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+      (err) => {
+        console.error("Geolocation error:", err);
+        setHasGpsFix(false);
       }
     );
 
@@ -121,6 +123,15 @@ const FullscreenCamera = () => {
         beta: event.beta ?? null,
         gamma: event.gamma ?? null,
       });
+
+      // ✅ once we get our first non-null reading, we know the sensor is live
+      if (
+        event.alpha != null &&
+        event.beta != null &&
+        event.gamma != null
+      ) {
+        setHasOrientationFix(true);
+      }
     };
 
     try {
@@ -162,12 +173,19 @@ const FullscreenCamera = () => {
 
   //********************************************************************** */
   const [still, setStill] = useState(false);
+  const [stillMs, setStillMs] = useState(0);
 
   const CHECK_EVERY_MS = 150;
 
   // thresholds for "no movement"
   const GPS_THRESHOLD = 0.00002; // ~2 meters in lat/lng
   const ORIENTATION_THRESHOLD = 15; // degrees
+
+  // require 2 seconds of stillness
+  const STILL_REQUIRED_MS = 2000;
+
+  // optional cooldown so it doesn't spam while you keep holding still
+  const COOLDOWN_MS = 2500;
 
   // store previous values
   const lastValuesRef = useRef({
@@ -178,8 +196,32 @@ const FullscreenCamera = () => {
     gamma: null,
   });
 
+  const stillSinceRef = useRef(null);
+  const lastTriggerRef = useRef(0);
+
+  // ✅ circular difference for 0-360 angles (handles 359 -> 1 as 2 degrees)
+  const angleDiff360 = (a, b) => {
+    const diff = Math.abs(a - b);
+    return Math.min(diff, 360 - diff);
+  };
+
+  const onStillFor2Seconds = () => {
+    console.log("✅ Still for 2 seconds. Trigger API call here.", {
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      heading,
+      alpha: orientation.alpha,
+      beta: orientation.beta,
+      gamma: orientation.gamma,
+      time: new Date().toISOString(),
+    });
+  };
+
   useEffect(() => {
     if (!isStarted) return;
+    if (!hasGpsFix) return;
+    if (!orientationEnabled) return;
+    if (!hasOrientationFix) return;
 
     const intervalId = setInterval(() => {
       const { latitude, longitude } = coords;
@@ -201,33 +243,60 @@ const FullscreenCamera = () => {
 
       // first run setup
       if (last.latitude === null) {
-        lastValuesRef.current = { latitude, longitude, alpha, beta, gamma };
+        lastValuesRef.current = { latitude: lat, longitude: lng, alpha: a, beta: b, gamma: g };
+        stillSinceRef.current = null;
+        setStill(false);
+        setStillMs(0);
         return;
       }
 
       const gpsMoved =
-        Math.abs(latitude - last.latitude) > GPS_THRESHOLD ||
-        Math.abs(longitude - last.longitude) > GPS_THRESHOLD;
+        Math.abs(lat - last.latitude) > GPS_THRESHOLD ||
+        Math.abs(lng - last.longitude) > GPS_THRESHOLD;
 
       const orientationMoved =
-        Math.abs(alpha - last.alpha) > ORIENTATION_THRESHOLD ||
-        Math.abs(beta - last.beta) > ORIENTATION_THRESHOLD ||
-        Math.abs(gamma - last.gamma) > ORIENTATION_THRESHOLD;
+        angleDiff360(a, last.alpha) > ORIENTATION_THRESHOLD ||
+        Math.abs(b - last.beta) > ORIENTATION_THRESHOLD ||
+        Math.abs(g - last.gamma) > ORIENTATION_THRESHOLD;
 
-      if (gpsMoved || orientationMoved) {
-        console.log("📍 Device moved");
+      // update baseline for next tick
+      lastValuesRef.current = { latitude: lat, longitude: lng, alpha: a, beta: b, gamma: g };
+
+      const moved = gpsMoved || orientationMoved;
+      const now = Date.now();
+
+      if (moved) {
+        // reset stillness timer
+        stillSinceRef.current = null;
         setStill(false);
-      } else {
-        console.log("🧊 Device still");
-        setStill(true);
+        setStillMs(0);
+        return;
       }
 
-      // update last values
-      lastValuesRef.current = { latitude, longitude, alpha, beta, gamma };
+      // still this tick: start timer if needed
+      if (stillSinceRef.current === null) {
+        stillSinceRef.current = now;
+        setStill(false);
+        setStillMs(0);
+        return;
+      }
+
+      const duration = now - stillSinceRef.current;
+      setStillMs(duration);
+
+      const isStillFor2s = duration >= STILL_REQUIRED_MS;
+      setStill(isStillFor2s);
+
+      // trigger once per cooldown while still
+      const sinceLastTrigger = now - lastTriggerRef.current;
+      if (isStillFor2s && sinceLastTrigger >= COOLDOWN_MS) {
+        lastTriggerRef.current = now;
+        onStillFor2Seconds();
+      }
     }, CHECK_EVERY_MS);
 
     return () => clearInterval(intervalId);
-  }, [isStarted, coords, orientation]);
+  }, [isStarted, hasGpsFix, orientationEnabled, hasOrientationFix, coords, orientation, heading]);
 
 
 
@@ -278,77 +347,77 @@ const FullscreenCamera = () => {
               <div className="swipeBar" />
             </div>
 
-            <div className="infoContent">
-              <div className="houseEmoji">🏠</div>
+              <div className="infoContent">
+                <div className="houseEmoji">🏠</div>
 
-              <h3 className="title">{predicted.building_name}</h3>
-              <p className="subtle">{predicted.location}</p>
+                <h3 className="title">{predicted.building_name}</h3>
+                <p className="subtle">{predicted.location}</p>
 
-              <div className="priceCard">
-                <div className="priceType">{predicted.predicted_price_or_rent.type}</div>
-                <div className="priceAmount">
-                  {predicted.predicted_price_or_rent.currency} ${predicted.predicted_price_or_rent.amount}
+                <div className="priceCard">
+                  <div className="priceType">{predicted.predicted_price_or_rent.type}</div>
+                  <div className="priceAmount">
+                    {predicted.predicted_price_or_rent.currency} ${predicted.predicted_price_or_rent.amount}
+                  </div>
+                  <div className="confidence">
+                    Confidence: {predicted.predicted_price_or_rent.confidence}
+                  </div>
                 </div>
-                <div className="confidence">
-                  Confidence: {predicted.predicted_price_or_rent.confidence}
+
+                <p className="notes">{predicted.predicted_price_or_rent.notes}</p>
+
+                <h3 className="sectionTitle">📈 Price Projection</h3>
+                <div className="sectionBlock">
+                  <div className="row"><strong>1 Year:</strong> ${predicted.future_price_projection["1_year"]}</div>
+                  <div className="row"><strong>5 Years:</strong> ${predicted.future_price_projection["5_year"]}</div>
+                  <div className="row">
+                    <strong>Trend:</strong> {predicted.future_price_projection.trend} (
+                    {predicted.future_price_projection.confidence})
+                  </div>
                 </div>
-              </div>
 
-              <p className="notes">{predicted.predicted_price_or_rent.notes}</p>
+                <p className="italicNote">{predicted.future_price_projection.notes}</p>
 
-              <h3 className="sectionTitle">📈 Price Projection</h3>
-              <div className="sectionBlock">
-                <div className="row"><strong>1 Year:</strong> ${predicted.future_price_projection["1_year"]}</div>
-                <div className="row"><strong>5 Years:</strong> ${predicted.future_price_projection["5_year"]}</div>
-                <div className="row">
-                  <strong>Trend:</strong> {predicted.future_price_projection.trend} (
-                  {predicted.future_price_projection.confidence})
+                <h3 className="sectionTitle">🛒 Nearby Grocery</h3>
+                <ul className="list">
+                  {predicted.nearby_food_grocery.map((store, i) => (
+                    <li key={i} className="listItem">{store}</li>
+                  ))}
+                </ul>
+
+                <h3 className="sectionTitle">🏫 Nearby Schools</h3>
+                <ul className="list">
+                  {predicted.nearby_schools.map((school, i) => (
+                    <li key={i} className="listItem">{school}</li>
+                  ))}
+                </ul>
+
+                <div className="footerHint">
+                  Swipe down to return to camera
                 </div>
-              </div>
-
-              <p className="italicNote">{predicted.future_price_projection.notes}</p>
-
-              <h3 className="sectionTitle">🛒 Nearby Grocery</h3>
-              <ul className="list">
-                {predicted.nearby_food_grocery.map((store, i) => (
-                  <li key={i} className="listItem">{store}</li>
-                ))}
-              </ul>
-
-              <h3 className="sectionTitle">🏫 Nearby Schools</h3>
-              <ul className="list">
-                {predicted.nearby_schools.map((school, i) => (
-                  <li key={i} className="listItem">{school}</li>
-                ))}
-              </ul>
-
-              <div className="footerHint">
-                Swipe down to return to camera
               </div>
             </div>
+          )}
+
+          {/* ℹ️ Info HUD */}
+          <div className="hud">
+            <div>📍 Lat: {coords.latitude ?? "---"}</div>
+            <div>📍 Lng: {coords.longitude ?? "---"}</div>
+            <div>🧭 Heading: {heading !== null ? `${heading}°` : "---"}</div>
+            <div>📐 Alpha: {orientation.alpha ?? "---"}°</div>
+            <div>📐 Beta: {orientation.beta ?? "---"}°</div>
+            <div>📐 Gamma: {orientation.gamma ?? "---"}°</div>
           </div>
-        )}
 
-        {/* ℹ️ Info HUD */}
-        <div className="hud">
-          <div>📍 Lat: {coords.latitude ?? "---"}</div>
-          <div>📍 Lng: {coords.longitude ?? "---"}</div>
-          <div>🧭 Heading: {heading !== null ? `${heading}°` : "---"}</div>
-          <div>📐 Alpha: {orientation.alpha ?? "---"}°</div>
-          <div>📐 Beta: {orientation.beta ?? "---"}°</div>
-          <div>📐 Gamma: {orientation.gamma ?? "---"}°</div>
-        </div>
-
-        {/* 🛡 Motion Permission */}
-        {!orientationEnabled && (
-          <button onClick={enableOrientation} className="enableOrientationBtn">
-            Enable Orientation
-          </button>
-        )}
-      </>
-    )}
-  </div>
-);
+          {/* 🛡 Motion Permission */}
+          {!orientationEnabled && (
+            <button onClick={enableOrientation} className="enableOrientationBtn">
+              Enable Orientation
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
 };
 
 export default FullscreenCamera;
