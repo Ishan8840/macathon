@@ -227,17 +227,20 @@ const FullscreenCamera = () => {
       const { latitude, longitude } = coords;
       const { alpha, beta, gamma } = orientation;
 
-      // wait until all values exist
-      if (
-        latitude === null ||
-        longitude === null ||
-        alpha === null ||
-        beta === null ||
-        gamma === null
-      ) {
-        setStill(false); 
+      // these should exist now, but guard anyway
+      if (latitude == null || longitude == null || alpha == null || beta == null || gamma == null) {
+        stillSinceRef.current = null;
+        setStill(false);
+        setStillMs(0);
         return;
       }
+
+      // convert strings -> numbers (because toFixed returns strings)
+      const lat = Number(latitude);
+      const lng = Number(longitude);
+      const a = Number(alpha);
+      const b = Number(beta);
+      const g = Number(gamma);
 
       const last = lastValuesRef.current;
 
@@ -301,51 +304,51 @@ const FullscreenCamera = () => {
 
 
   return (
-  <div className="arRoot">
-    {/* Start AR Button */}
-    {!isStarted && (
-      <button onClick={() => setIsStarted(true)} className="startARBtn">
-        Start AR
-      </button>
-    )}
+    <div className="arRoot">
+      {/* Start AR Button */}
+      {!isStarted && (
+        <button onClick={() => setIsStarted(true)} className="startARBtn">
+          Start AR
+        </button>
+      )}
 
-    {/* All camera and UI elements - only show after start */}
-    {isStarted && (
-      <>
-        {/* 📷 Fullscreen Camera */}
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="cameraVideo"
-        />
+      {/* All camera and UI elements - only show after start */}
+      {isStarted && (
+        <>
+          {/* 📷 Fullscreen Camera */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="cameraVideo"
+          />
 
-        {/* 🔴 Red Dot Center */}
-        <div className="centerDot" />
+          {/* 🔴 Red Dot Center */}
+          <div className="centerDot" />
 
-        {/* 🏠 House Icon - Bottom Right */}
-        {still && (
-          <button
-            onClick={() => setShowInfo(true)}
-            className="houseBtn"
-          >
-            🏠
-          </button>
-        )}
-        {/* <div className={still ? "showing" : "hidden"}>STILL!</div> TESSTTTTTT!!!!!!!!!!!!!!!!!!!!!!! */}
+          {/* 🏠 House Icon - Bottom Right */}
+          {still && (
+            <button
+              onClick={() => setShowInfo(true)}
+              className="houseBtn"
+            >
+              🏠
+            </button>
+          )}
+          {/* <div className={still ? "showing" : "hidden"}>STILL!</div> TESSTTTTTT!!!!!!!!!!!!!!!!!!!!!!! */}
 
-        {/* 🪧 Property Info Panel - Slide Up */}
-        {showInfo && (
-          <div
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-            className="infoPanel"
-          >
-            {/* Swipe indicator */}
-            <div className="swipeHeader">
-              <div className="swipeBar" />
-            </div>
+          {/* 🪧 Property Info Panel - Slide Up */}
+          {showInfo && (
+            <div
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              className="infoPanel"
+            >
+              {/* Swipe indicator */}
+              <div className="swipeHeader">
+                <div className="swipeBar" />
+              </div>
 
               <div className="infoContent">
                 <div className="houseEmoji">🏠</div>
