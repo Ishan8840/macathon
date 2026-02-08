@@ -369,9 +369,14 @@ useEffect(() => {
               🏠
             </button>
           )}
+          {predicted && (
+            <div>
+              <p>{predicted.building_name}</p>
+            </div>
+          )}
 
           {/* 🪧 Property Info Panel - Slide Up */}
-                    {showInfo && (
+          {/* {showInfo && (
             <div
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
@@ -448,7 +453,7 @@ useEffect(() => {
                 )}
               </div>
             </div>
-          )}
+          )} */}
 
           {/* 🛡 Motion Permission */}
           {!orientationEnabled && (
