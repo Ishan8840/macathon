@@ -375,14 +375,10 @@ useEffect(() => {
               🏠
             </button>
           )}
-          {predicted && (
-            <div>
-              <p>{predicted.building_name}</p>
-            </div>
-          )}
+        
 
-          {/* 🪧 Property Info Panel - Slide Up */}
-          {/* {showInfo && (
+          {/*🪧 Property Info Panel - Slide Up */}
+          {showInfo && (
             <div
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
@@ -412,7 +408,7 @@ useEffect(() => {
                     <h3 className="title">{predicted.building_name}</h3>
                     <p className="subtle">{predicted.location}</p>
 
-                    <div className="priceCard">
+                    {/* <div className="priceCard">
                       <div className="priceType">{predicted.predicted_price_or_rent?.type}</div>
                       <div className="priceAmount">
                         {predicted.predicted_price_or_rent?.currency} ${predicted.predicted_price_or_rent?.amount}
@@ -454,12 +450,12 @@ useEffect(() => {
                       ))}
                     </ul>
 
-                    <div className="footerHint">Swipe down to return to camera</div>
+                    <div className="footerHint">Swipe down to return to camera</div> */}
                   </>
                 )}
               </div>
             </div>
-          )} */}
+          )}
 
           {/* 🛡 Motion Permission */}
           {!orientationEnabled && (
