@@ -31,8 +31,8 @@
   width: 100vw;
   height: 100vh;
   object-fit: cover;
-  background-color: black;
-  z-index: 99999;
+  background-color: rgb(255, 23, 23);
+  z-index: 0;
 }
 
 /* Center red dot */
