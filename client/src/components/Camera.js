@@ -28,15 +28,15 @@ const FullscreenCamera = () => {
 
   const FIND_RADIUS = 50;
 
-  async function fetchNearbyBuildings(lat, lon) {
+  async function fetchNearbyBuildings() {
     const response = await fetch("https://macathon.onrender.com/buildings/nearby", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        latitude: lat,
-        longitude: lon,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
         radius: FIND_RADIUS,
       }),
     });
@@ -228,7 +228,7 @@ const FullscreenCamera = () => {
           setStill(false);
         } else if (now - stillSinceRef.current >= STILL_REQUIRED_MS) {
           setStill(true);
-          fetchNearbyBuildings(coords.latitude, coords.longitude);
+          fetchNearbyBuildings();
         }
       }
 
@@ -239,7 +239,7 @@ const FullscreenCamera = () => {
     return () => clearInterval(intervalId);
 
     // 5️⃣ REMOVE 'orientation' from dependencies so the interval stays alive
-  }, [isStarted, hasGpsFix, hasOrientationFix, coords.latitude, coords.longitude]);
+  }, [isStarted, hasGpsFix, hasOrientationFix]);
 
 
 
