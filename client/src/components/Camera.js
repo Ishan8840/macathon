@@ -79,6 +79,14 @@ const FullscreenCamera = () => {
       }
     };
     startCamera();
+
+    return () => {
+      if (videoRef.current?.srcObject) {
+        const stream = videoRef.current.srcObject;
+        const tracks = stream.getTracks();
+        tracks.forEach(track => track.stop());
+      }
+    };
   }, [isStarted]);
 
   // 📍 Geolocation updates
