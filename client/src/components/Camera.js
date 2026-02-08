@@ -251,7 +251,7 @@ useEffect(() => {
   }, [orientation]);
 
   const CHECK_EVERY_MS = 150;
-  const STILL_REQUIRED_MS = 2000;
+  const STILL_REQUIRED_MS = 1000;
   const ORIENTATION_THRESHOLD = 15;
 
   const angleDiff360 = (a, b) => {
