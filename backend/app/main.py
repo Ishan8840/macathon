@@ -25,21 +25,6 @@ DEFAULT_RADIUS_M = 150
 DEFAULT_CONE_DEG = 60
 
 
-@app.get("/building")
-def building(lat: float, lon: float):
-    try:
-        details = get_building_name_free(lat, lon)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Nominatim error: {e}")
-    
-    predicted = generate_summary(details)
-
-    # 3) return
-    return {
-        "predicted": predicted,
-    }
-
-
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -53,13 +38,15 @@ async def buildings_nearby(
 ):
     try:
         buildings = await get_buildings_within_radius(
-            user_lat=lat,
-            user_lng=lng,
-            heading_deg=heading_deg,
-            radius_m=radius_m,
+            user_lat=lat, user_lng=lng, heading_deg=heading_deg, radius_m=radius_m
         )
-        house = pick_house(lat, lng, heading_deg, buildings, radius_m)
-        print(house)
-        return house
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=502, detail=f"DB/radius error: {e}")
+
+    try:
+        house = pick_house(lat, lng, heading_deg, buildings, radius_m)
+        details = get_building_name_free(house['lat'], house['lon'])
+        predicted = generate_summary(details)
+        return predicted
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"pick_house error: {e}")
