@@ -3,7 +3,15 @@
   position: fixed;
   inset: 0;
   overflow: hidden;
-  background-color: black;
+  background: linear-gradient(135deg, #000000 0%, #001a33 25%, #000d1a 50%, #001a33 75%, #000000 100%);
+  background-size: 400% 400%;
+  animation: techGradient 15s ease infinite;
+}
+
+@keyframes techGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 /* Start AR button */
@@ -31,7 +39,7 @@
   width: 100vw;
   height: 100vh;
   object-fit: cover;
-  background-color: black;
+  background-color: rgb(0, 0, 0);
   z-index: 0;
 }
 
@@ -40,12 +48,63 @@
   position: fixed;
   top: 50%;
   left: 50%;
+  width: 120px;   /* box size */
+  height: 120px;
   transform: translate(-50%, -50%);
-  width: 14px;
-  height: 14px;
-  background-color: red;
-  border-radius: 50%;
-  z-index: 2;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* shared corner style */
+.centerDot::before,
+.centerDot::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid white;
+}
+
+/* top-left */
+.centerDot::before {
+  top: 0;
+  left: 0;
+  border-right: none;
+  border-bottom: none;
+}
+
+/* bottom-right */
+.centerDot::after {
+  bottom: 0;
+  right: 0;
+  border-left: none;
+  border-top: none;
+}
+
+/* extra elements for other 2 corners */
+.centerDot span::before,
+.centerDot span::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid white;
+}
+
+/* top-right */
+.centerDot span::before {
+  top: 0;
+  right: 0;
+  border-left: none;
+  border-bottom: none;
+}
+
+/* bottom-left */
+.centerDot span::after {
+  bottom: 0;
+  left: 0;
+  border-right: none;
+  border-top: none;
 }
 
 /* House button bottom-right */

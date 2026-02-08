@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import "./Camera.css"
 
 const FullscreenCamera = () => {
@@ -26,46 +26,121 @@ const FullscreenCamera = () => {
   const [showInfo, setShowInfo] = useState(false);
   const touchStartY = useRef(0);
 
-  const FIND_RADIUS = 50;
+  const [predicted, setPredicted] = useState(null);
+  const [isFetching, setIsFetching] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
 
-  async function fetchNearbyBuildings() {
-    const response = await fetch("https://macathon.onrender.com/buildings/nearby", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        heading: heading,
-        radius: FIND_RADIUS,
-      }),
-    });
+  // prevents calling API every 150ms while still==true
+  const didFetchForCurrentStillRef = useRef(false);
 
-    const data = await response.json();
-    setApiData(data);
-  }
+  const fetchPrediction = useCallback(async () => {
+    if (coords.latitude == null || coords.longitude == null || heading == null) return;
+
+    setIsFetching(true);
+    setFetchError(null);
+
+    try {
+      const params = new URLSearchParams({
+        lat: String(coords.latitude),
+        lng: String(coords.longitude),
+        heading_deg: String(heading),
+        radius_m: "100",
+      });
+
+      const res = await fetch(`https://macathon.onrender.com/buildings/nearby?${params.toString()}`);
+
+      if (!res.ok) throw new Error("API error");
+
+      const data = await res.json();
+      setPredicted(typeof data === "string" ? JSON.parse(data) : data);
+
+    } catch (e) {
+      setFetchError(e.message);
+    } finally {
+      setIsFetching(false);
+    }
+  }, [coords.latitude, coords.longitude, heading]);
 
   // 📸 Start rear camera
-  useEffect(() => {
-    if (!isStarted) return;
+  const streamRef = useRef(null);
 
-    const startCamera = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: "environment" } },
-          audio: false,
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-      } catch (error) {
-        console.error("Camera error:", error);
+useEffect(() => {
+  if (!isStarted) return;
+
+  let cancelled = false;
+
+  const stopStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  };
+
+  const startStream = async () => {
+    try {
+      stopStream();
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+
+      if (cancelled) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
       }
-    };
-    startCamera();
-  }, [isStarted]);
+
+      streamRef.current = stream;
+
+      const video = videoRef.current;
+      if (!video) return;
+
+      video.srcObject = stream;
+
+      // iOS sometimes needs these explicitly
+      video.setAttribute("playsinline", "true");
+      video.muted = true;
+
+      // Start playback
+      await video.play().catch((e) => {
+        console.log("video.play() failed:", e);
+      });
+
+      // Restart if track ends (common on iOS when something interrupts)
+      const [track] = stream.getVideoTracks();
+      if (track) {
+        track.onended = () => {
+          console.log("TRACK ended → restarting camera");
+          startStream();
+        };
+      }
+
+      // Optional debug:
+      // attachDebug(video, stream);
+
+    } catch (e) {
+      console.error("Camera error:", e);
+    }
+  };
+
+  const onVisibility = () => {
+    // When user switches tabs / permissions prompt / etc.
+    if (document.visibilityState === "visible") {
+      console.log("Tab visible → ensure camera playing");
+      startStream();
+    }
+  };
+
+  startStream();
+  document.addEventListener("visibilitychange", onVisibility);
+
+  return () => {
+    cancelled = true;
+    document.removeEventListener("visibilitychange", onVisibility);
+    stopStream();
+  };
+}, [isStarted]);
+
 
   // 📍 Geolocation updates
   useEffect(() => {
@@ -177,7 +252,7 @@ const FullscreenCamera = () => {
   }, [orientation]);
 
   const CHECK_EVERY_MS = 150;
-  const STILL_REQUIRED_MS = 2000;
+  const STILL_REQUIRED_MS = 1000;
   const ORIENTATION_THRESHOLD = 15;
 
   const angleDiff360 = (a, b) => {
@@ -242,6 +317,27 @@ const FullscreenCamera = () => {
     // 5️⃣ REMOVE 'orientation' from dependencies so the interval stays alive
   }, [isStarted, hasGpsFix, hasOrientationFix]);
 
+  useEffect(() => {
+    if (!still) {
+      didFetchForCurrentStillRef.current = false;
+      return;
+    }
+
+    if (didFetchForCurrentStillRef.current) return;
+    if (!hasGpsFix || !hasOrientationFix) return;
+
+    didFetchForCurrentStillRef.current = true;
+    fetchPrediction();
+    console.log(showInfo);
+    console.log(isFetching);
+    console.log(fetchError);
+    console.log(handleTouchEnd);
+    console.log(handleTouchStart);
+
+
+  }, [still, hasGpsFix, hasOrientationFix, fetchPrediction, fetchError, isFetching, showInfo]);
+
+
 
 
   return (
@@ -266,60 +362,105 @@ const FullscreenCamera = () => {
           />
 
           {/* 🔴 Red Dot Center */}
-          <div className="centerDot" />
+          <div className="centerDot">
+            <span />
+          </div>
+
 
           {/* 🏠 House Icon - Bottom Right */}
           {still && (
             <button
-              onClick={() => setShowInfo(true)}
+              onClick={() => {
+                setShowInfo(true);
+                // optional: if you want tap to force refresh
+                // fetchPrediction();
+              }}
               className="houseBtn"
             >
               🏠
             </button>
           )}
-          <div className={still ? "showing" : "hidden"}>STILL!</div> {/*TESSTTTTTT!!!!!!!!!!!!!!!!!!!!!!! */}
+        
 
-          {/* 🪧 Property Info Panel - Slide Up */}
+          {/*🪧 Property Info Panel - Slide Up */}
           {showInfo && (
             <div
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
               className="infoPanel"
             >
-              {/* Swipe indicator */}
               <div className="swipeHeader">
                 <div className="swipeBar" />
               </div>
 
               <div className="infoContent">
-                <div className="text">
-                  {apiData &&
-                    <div className="title"> {apiData.building_name}
-                      <ul>
-                        {Object.entries(apiData).slice(1).map(([key, value]) => (
-                          <li key={key}>
-                            <strong>{key}:</strong>{" "}
-                            {typeof value === "object"
-                              ? JSON.stringify(value)
-                              : value}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>}
-                </div>
+                <div className="houseEmoji">🏠</div>
+
+                {isFetching && <p className="subtle">Loading...</p>}
+
+                {fetchError && (
+                  <p className="subtle" style={{ opacity: 0.9 }}>
+                    Error: {fetchError}
+                  </p>
+                )}
+
+                {!isFetching && !fetchError && !predicted && (
+                  <p className="subtle">No prediction yet. Hold still to scan.</p>
+                )}
+
+                {!isFetching && !fetchError && predicted && (
+                  <>
+                    <h3 className="title">{predicted.building_name}</h3>
+                    <p className="subtle">{predicted.location}</p>
+
+                    <div className="priceCard">
+                      <div className="priceType">{predicted.predicted_price_or_rent.type}</div>
+                      <div className="priceAmount">
+                        {predicted.predicted_price_or_rent?.currency} ${predicted.predicted_price_or_rent.amount}
+                      </div>
+                      <div className="confidence">
+                        Confidence: {predicted.predicted_price_or_rent.confidence}
+                      </div>
+                    </div>
+
+                    <p className="notes">{predicted.predicted_price_or_rent?.notes}</p>
+
+                    <h3 className="sectionTitle">📈 Price Projection</h3>
+                    <div className="sectionBlock">
+                      <div className="row">
+                        <strong>1 Year:</strong> ${predicted.future_price_projection?.["1_year"]}
+                      </div>
+                      <div className="row">
+                        <strong>5 Years:</strong> ${predicted.future_price_projection?.["5_year"]}
+                      </div>
+                      <div className="row">
+                        <strong>Trend:</strong> {predicted.future_price_projection?.trend} (
+                        {predicted.future_price_projection?.confidence})
+                      </div>
+                    </div>
+
+                    <p className="italicNote">{predicted.future_price_projection?.notes}</p>
+
+                    <h3 className="sectionTitle">🛒 Nearby Food</h3>
+                    <ul className="list">
+                      {(predicted.nearby_food || []).map((place, i) => (
+                        <li key={i} className="listItem">{place.name}</li>
+                      ))}
+                    </ul>
+
+                    <h3 className="sectionTitle">🏫 Nearby Schools</h3>
+                    <ul className="list">
+                      {(predicted.nearby_schools || []).map((school, i) => (
+                        <li key={i} className="listItem">{school.name}</li>
+                      ))}
+                    </ul>
+
+                    <div className="footerHint">Swipe down to return to camera</div>
+                  </>
+                )}
               </div>
             </div>
           )}
-
-          {/* ℹ️ Info HUD */}
-          <div className="hud">
-            <div>📍 Lat: {coords.latitude ?? "---"}</div>
-            <div>📍 Lng: {coords.longitude ?? "---"}</div>
-            <div>🧭 Heading: {heading !== null ? `${heading}°` : "---"}</div>
-            <div>📐 Alpha: {orientation.alpha ?? "---"}°</div>
-            <div>📐 Beta: {orientation.beta ?? "---"}°</div>
-            <div>📐 Gamma: {orientation.gamma ?? "---"}°</div>
-          </div>
 
           {/* 🛡 Motion Permission */}
           {!orientationEnabled && (
