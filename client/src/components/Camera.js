@@ -333,7 +333,7 @@ useEffect(() => {
     console.log(handleTouchStart);
 
 
-  }, [still, hasGpsFix, hasOrientationFix, fetchPrediction]);
+  }, [still, hasGpsFix, hasOrientationFix, fetchPrediction, fetchError, isFetching, showInfo]);
 
 
 
