@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import "./Camera.css"
 
 const FullscreenCamera = () => {
@@ -32,7 +32,7 @@ const FullscreenCamera = () => {
   // prevents calling API every 150ms while still==true
   const didFetchForCurrentStillRef = useRef(false);
 
-    const fetchPrediction = async () => {
+  const fetchPrediction = useCallback(async () => {
     if (coords.latitude == null || coords.longitude == null || heading == null) return;
 
     setIsFetching(true);
@@ -46,30 +46,19 @@ const FullscreenCamera = () => {
         radius_m: "100",
       });
 
-      const res = await fetch(`https://macathon.onrender.com/buildings/nearby?${params.toString()}`, {
-        method: "GET",
-        headers: { "Accept": "application/json" },
-      });
+      const res = await fetch(`${API_BASE}/buildings/nearby?${params.toString()}`);
 
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(`API ${res.status}: ${txt}`);
-      }
+      if (!res.ok) throw new Error("API error");
 
       const data = await res.json();
+      setPredicted(typeof data === "string" ? JSON.parse(data) : data);
 
-      // if your backend returns JSON as a string sometimes, handle it:
-      const parsed = typeof data === "string" ? JSON.parse(data) : data;
-
-      setPredicted(parsed);
     } catch (e) {
-      console.error(e);
-      setFetchError(e.message || "Failed to fetch prediction");
-      setPredicted(null);
+      setFetchError(e.message);
     } finally {
       setIsFetching(false);
     }
-  };
+  }, [coords.latitude, coords.longitude, heading]);
 
   // 📸 Start rear camera
   useEffect(() => {
@@ -266,24 +255,19 @@ const FullscreenCamera = () => {
     // 5️⃣ REMOVE 'orientation' from dependencies so the interval stays alive
   }, [isStarted, hasGpsFix, hasOrientationFix]);
 
-    useEffect(() => {
-    // when still becomes false again, allow a new fetch next time
+  useEffect(() => {
     if (!still) {
       didFetchForCurrentStillRef.current = false;
       return;
     }
 
-    // only fetch once per still “session”
     if (didFetchForCurrentStillRef.current) return;
-
-    // require usable inputs
     if (!hasGpsFix || !hasOrientationFix) return;
-    if (coords.latitude == null || coords.longitude == null) return;
-    if (heading == null) return;
 
     didFetchForCurrentStillRef.current = true;
     fetchPrediction();
-  }, [still, hasGpsFix, hasOrientationFix, coords.latitude, coords.longitude, heading]);
+
+  }, [still, hasGpsFix, hasOrientationFix, fetchPrediction]);
 
 
 
