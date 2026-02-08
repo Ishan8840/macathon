@@ -25,6 +25,19 @@ def generate_summary(location: dict):
         {{
         "building_name": "",
         "location": "",
+        "distance": {
+            "distance_km": "",
+            "estimated_time_minutes": "",
+            "confidence": "low|medium|high",
+            "notes": ""
+        },
+        "nearby_bus_stop": {
+            "name": "",
+            "routes": [],
+            "distance_m": "",
+            "confidence": "low|medium|high",
+            "notes": ""
+        },
         "predicted_price_or_rent": {{
             "type": "rent_or_sale",
             "amount": "",
@@ -46,6 +59,8 @@ def generate_summary(location: dict):
         Rules:
         - At least 3 food places
         - At least 3 schools
+        - Walking distance from McMaster University
+        - At least 1 nearby bus stop.
         - Use estimates if unknown
 
         INPUT:

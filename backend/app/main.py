@@ -1,13 +1,8 @@
-from typing import Dict, List
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import time
-from .models import IdentifyResponse, BuildingOut, LatLon, Meta
 from .selection import pick_house, get_building_name_free
 from .gemini_client import generate_summary
 from .radius import get_buildings_within_radius
-from contextlib import asynccontextmanager
-import asyncpg
 import os
 
 DATABASE_URL = os.environ["SUPABASE_DB_URL"]   

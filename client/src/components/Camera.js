@@ -37,6 +37,7 @@ const FullscreenCamera = () => {
       body: JSON.stringify({
         latitude: coords.latitude,
         longitude: coords.longitude,
+        heading: heading,
         radius: FIND_RADIUS,
       }),
     });
