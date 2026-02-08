@@ -64,6 +64,8 @@ const FullscreenCamera = () => {
   useEffect(() => {
     if (!isStarted) return;
 
+    const videoElement = videoRef.current;
+
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -81,7 +83,6 @@ const FullscreenCamera = () => {
     startCamera();
 
     return () => {
-      const video = videoRef.current; // Copy ref to local variable
       if (video?.srcObject) {
         const stream = video.srcObject;
         const tracks = stream.getTracks();
