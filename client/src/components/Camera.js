@@ -260,7 +260,7 @@ const FullscreenCamera = () => {
     }, CHECK_EVERY_MS);
 
     return () => clearInterval(intervalId);
-  }, [isStarted, coords, orientation]);
+  }, [isStarted, coords, orientation, hasGpsFix, orientationEnabled, hasOrientationFix]);
 
 
 
