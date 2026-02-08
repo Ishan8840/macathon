@@ -189,9 +189,6 @@ const FullscreenCamera = () => {
 
   useEffect(() => {
     if (!isStarted) return;
-    if (!hasGpsFix) return;
-    if (!orientationEnabled) return;
-    if (!hasOrientationFix) return;
 
     const intervalId = setInterval(() => {
       const { alpha, beta, gamma } = orientation;
