@@ -6,6 +6,7 @@ const FullscreenCamera = () => {
   const [isStarted, setIsStarted] = useState(false);
   const [hasGpsFix, setHasGpsFix] = useState(false);
   const [hasOrientationFix, setHasOrientationFix] = useState(false);
+  const [apiData, setApiData] = useState(null);
 
   const [coords, setCoords] = useState({
     latitude: null,
@@ -25,36 +26,24 @@ const FullscreenCamera = () => {
   const [showInfo, setShowInfo] = useState(false);
   const touchStartY = useRef(0);
 
-  const predicted = {
-    building_name: "14 Arnall Avenue",
-    location: "Toronto, Canada",
-    predicted_price_or_rent: {
-      type: "rent",
-      amount: "3500",
-      currency: "CAD",
-      confidence: "medium",
-      notes:
-        "Estimated monthly rent for a typical residential unit in the Scarborough area, reflecting current market conditions for similar properties.",
-    },
-    future_price_projection: {
-      "1_year": "3605",
-      "5_year": "4025",
-      trend: "up",
-      confidence: "medium",
-      notes:
-        "Projections based on historical performance of Toronto's residential market and anticipated economic stability, with moderate growth expected.",
-    },
-    nearby_food_grocery: [
-      "FreshCo (Sheppard & Markham)",
-      "Walmart Supercentre (Sheppard Ave E)",
-      "T&T Supermarket (Middlefield Rd)",
-    ],
-    nearby_schools: [
-      "Mary Ward Catholic Secondary School",
-      "Silver Springs Public School",
-      "Agincourt Junior Public School",
-    ],
-  };
+  const FIND_RADIUS = 50;
+
+  async function fetchNearbyBuildings(lat, lon) {
+    const response = await fetch("https://macathon.onrender.com/buildings/nearby", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        latitude: lat,
+        longitude: lon,
+        radius: FIND_RADIUS,
+      }),
+    });
+
+    const data = await response.json();
+    setApiData(data);
+  }
 
   // 📸 Start rear camera
   useEffect(() => {
@@ -174,8 +163,8 @@ const FullscreenCamera = () => {
   //********************************************************************** */
   const [still, setStill] = useState(false);
 
-  const lastOrientationRef = useRef(null);   
-  const stillSinceRef = useRef(null);        
+  const lastOrientationRef = useRef(null);
+  const stillSinceRef = useRef(null);
 
   // 1️⃣ NEW: Create a Ref to hold the current orientation
   // This allows the interval to read the latest value without restarting
@@ -235,10 +224,11 @@ const FullscreenCamera = () => {
         setStill(false);
       } else {
         if (stillSinceRef.current === null) {
-          stillSinceRef.current = now; 
+          stillSinceRef.current = now;
           setStill(false);
         } else if (now - stillSinceRef.current >= STILL_REQUIRED_MS) {
           setStill(true);
+          fetchNearbyBuildings(coords.latitude, coords.longitude);
         }
       }
 
@@ -247,7 +237,7 @@ const FullscreenCamera = () => {
     }, CHECK_EVERY_MS);
 
     return () => clearInterval(intervalId);
-    
+
     // 5️⃣ REMOVE 'orientation' from dependencies so the interval stays alive
   }, [isStarted, hasGpsFix, hasOrientationFix]);
 
@@ -301,51 +291,20 @@ const FullscreenCamera = () => {
               </div>
 
               <div className="infoContent">
-                <div className="houseEmoji">🏠</div>
-
-                <h3 className="title">{predicted.building_name}</h3>
-                <p className="subtle">{predicted.location}</p>
-
-                <div className="priceCard">
-                  <div className="priceType">{predicted.predicted_price_or_rent.type}</div>
-                  <div className="priceAmount">
-                    {predicted.predicted_price_or_rent.currency} ${predicted.predicted_price_or_rent.amount}
-                  </div>
-                  <div className="confidence">
-                    Confidence: {predicted.predicted_price_or_rent.confidence}
-                  </div>
-                </div>
-
-                <p className="notes">{predicted.predicted_price_or_rent.notes}</p>
-
-                <h3 className="sectionTitle">📈 Price Projection</h3>
-                <div className="sectionBlock">
-                  <div className="row"><strong>1 Year:</strong> ${predicted.future_price_projection["1_year"]}</div>
-                  <div className="row"><strong>5 Years:</strong> ${predicted.future_price_projection["5_year"]}</div>
-                  <div className="row">
-                    <strong>Trend:</strong> {predicted.future_price_projection.trend} (
-                    {predicted.future_price_projection.confidence})
-                  </div>
-                </div>
-
-                <p className="italicNote">{predicted.future_price_projection.notes}</p>
-
-                <h3 className="sectionTitle">🛒 Nearby Grocery</h3>
-                <ul className="list">
-                  {predicted.nearby_food_grocery.map((store, i) => (
-                    <li key={i} className="listItem">{store}</li>
-                  ))}
-                </ul>
-
-                <h3 className="sectionTitle">🏫 Nearby Schools</h3>
-                <ul className="list">
-                  {predicted.nearby_schools.map((school, i) => (
-                    <li key={i} className="listItem">{school}</li>
-                  ))}
-                </ul>
-
-                <div className="footerHint">
-                  Swipe down to return to camera
+                <div className="text">
+                  {apiData &&
+                    <div className="title"> {apiData.building_name}
+                      <ul>
+                        {Object.entries(apiData).slice(1).map(([key, value]) => (
+                          <li key={key}>
+                            <strong>{key}:</strong>{" "}
+                            {typeof value === "object"
+                              ? JSON.stringify(value)
+                              : value}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>}
                 </div>
               </div>
             </div>
