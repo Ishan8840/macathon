@@ -174,19 +174,12 @@ const FullscreenCamera = () => {
   //********************************************************************** */
   const [still, setStill] = useState(false);
 
+  const lastOrientationRef = useRef(null);   // last orientation sample
+  const stillSinceRef = useRef(null);        // when "stillness" started
+
   const CHECK_EVERY_MS = 150;
-
-  // thresholds for "no movement"
-  const GPS_THRESHOLD = 0.00002; // ~2 meters in lat/lng
-  const ORIENTATION_THRESHOLD = 15; // degrees
-
-  // require 2 seconds of stillness
   const STILL_REQUIRED_MS = 2000;
-
-  // store previous values
-  const lastValuesRef = useRef(null);
-
-  const stillSinceRef = useRef(null);
+  const ORIENTATION_THRESHOLD = 15; // degrees
 
   // ✅ circular difference for 0-360 angles (handles 359 -> 1 as 2 degrees)
   const angleDiff360 = (a, b) => {
@@ -201,66 +194,52 @@ const FullscreenCamera = () => {
     if (!hasOrientationFix) return;
 
     const intervalId = setInterval(() => {
-      const { latitude, longitude } = coords;
       const { alpha, beta, gamma } = orientation;
 
-      // wait until all values exist
-      if (
-        latitude == null ||
-        longitude == null ||
-        alpha == null ||
-        beta == null ||
-        gamma == null
-      ) {
+      if (alpha == null || beta == null || gamma == null) {
+        lastOrientationRef.current = null;
         stillSinceRef.current = null;
         setStill(false);
         return;
       }
 
-      const current = { latitude, longitude, alpha, beta, gamma };
-      const last = lastValuesRef.current;
+      const current = { alpha, beta, gamma };
+      const last = lastOrientationRef.current;
 
-      // first run → set baseline only
-      if (!last) {
-        lastValuesRef.current = current;
+      if (last === null) {
+        lastOrientationRef.current = current;
         stillSinceRef.current = null;
         setStill(false);
         return;
       }
-
-      const gpsMoved =
-        Math.abs(latitude - last.latitude) > GPS_THRESHOLD ||
-        Math.abs(longitude - last.longitude) > GPS_THRESHOLD;
 
       const orientationMoved =
         angleDiff360(alpha, last.alpha) > ORIENTATION_THRESHOLD ||
         Math.abs(beta - last.beta) > ORIENTATION_THRESHOLD ||
         Math.abs(gamma - last.gamma) > ORIENTATION_THRESHOLD;
 
-      const moved = gpsMoved || orientationMoved;
       const now = Date.now();
 
-      if (moved) {
-        stillSinceRef.current = null;
+      if (orientationMoved) {
+      // movement resets stillness
+      stillSinceRef.current = null;
+      setStill(false);
+    } else {
+      // orientation stable this tick
+      if (stillSinceRef.current === null) {
+        stillSinceRef.current = now; // start timer
         setStill(false);
-      } else {
-        if (stillSinceRef.current === null) {
-          stillSinceRef.current = now; // start timer
-          setStill(false);
-        } else {
-          const duration = now - stillSinceRef.current;
-          if (duration >= STILL_REQUIRED_MS) {
-            setStill(true);
-          }
-        }
+      } else if (now - stillSinceRef.current >= STILL_REQUIRED_MS) {
+        setStill(true);
       }
+    }
 
-      // update baseline
-      lastValuesRef.current = current;
-    }, CHECK_EVERY_MS);
+    // update baseline
+    lastOrientationRef.current = current;
+  }, CHECK_EVERY_MS);
 
     return () => clearInterval(intervalId);
-  }, [isStarted, coords, orientation, hasGpsFix, orientationEnabled, hasOrientationFix]);
+  }, [isStarted, orientation]);
 
 
 
