@@ -3,6 +3,7 @@ import "./Camera.css"
 
 const FullscreenCamera = () => {
   const videoRef = useRef(null);
+  const streamRef = useRef(null);
   const [isStarted, setIsStarted] = useState(false);
   const [hasGpsFix, setHasGpsFix] = useState(false);
   const [hasOrientationFix, setHasOrientationFix] = useState(false);
@@ -57,19 +58,37 @@ const FullscreenCamera = () => {
       setFetchError(e.message);
     } finally {
       setIsFetching(false);
-    }
+
+      // ✅ iOS/Safari sometimes pauses video after heavy work/network
+      if (videoRef.current) {
+        try {
+          await videoRef.current.play();
+        } catch {}
+      }
+    } 
   }, [coords.latitude, coords.longitude, heading]);
 
   // 📸 Start rear camera
   useEffect(() => {
     if (!isStarted) return;
 
+    let cancelled = false;
+
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: "environment" } },
+          video: { facingMode: "environment" }, // ✅ no "exact"
           audio: false,
         });
+
+        // if effect cleaned up before stream arrives
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
@@ -78,7 +97,17 @@ const FullscreenCamera = () => {
         console.error("Camera error:", error);
       }
     };
+
     startCamera();
+
+    // ✅ IMPORTANT: stop the camera when component unmounts / restarts
+    return () => {
+      cancelled = true;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+    };
   }, [isStarted]);
 
   // 📍 Geolocation updates
