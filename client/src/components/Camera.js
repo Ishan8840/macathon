@@ -82,10 +82,10 @@ const FullscreenCamera = () => {
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         setCoords({
-          latitude: position.coords.latitude.toFixed(6),
-          longitude: position.coords.longitude.toFixed(6),
-          accuracy: position.coords.accuracy.toFixed(2),
-          timestamp: new Date(position.timestamp).toLocaleTimeString(),
+          latitude: position.coords.latitude,   // ✅ keep as number
+          longitude: position.coords.longitude, // ✅ keep as number
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp,
         });
       },
       (err) => console.error("Geolocation error:", err),
@@ -117,9 +117,9 @@ const FullscreenCamera = () => {
       }
 
       setOrientation({
-        alpha: event.alpha?.toFixed(1) ?? null,
-        beta: event.beta?.toFixed(1) ?? null,
-        gamma: event.gamma?.toFixed(1) ?? null,
+        alpha: event.alpha ?? null, // ✅ keep as number
+        beta: event.beta ?? null,
+        gamma: event.gamma ?? null,
       });
     };
 
@@ -161,7 +161,7 @@ const FullscreenCamera = () => {
   };
 
   //********************************************************************** */
-  const [still, setStill] = useState(true);
+  const [still, setStill] = useState(false);
 
   const CHECK_EVERY_MS = 150;
 
@@ -193,6 +193,7 @@ const FullscreenCamera = () => {
         beta === null ||
         gamma === null
       ) {
+        setStill(false); 
         return;
       }
 
