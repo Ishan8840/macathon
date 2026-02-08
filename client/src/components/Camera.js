@@ -25,35 +25,50 @@ const FullscreenCamera = () => {
   const [showInfo, setShowInfo] = useState(false);
   const touchStartY = useRef(0);
 
-  const predicted = {
-    building_name: "14 Arnall Avenue",
-    location: "Toronto, Canada",
-    predicted_price_or_rent: {
-      type: "rent",
-      amount: "3500",
-      currency: "CAD",
-      confidence: "medium",
-      notes:
-        "Estimated monthly rent for a typical residential unit in the Scarborough area, reflecting current market conditions for similar properties.",
-    },
-    future_price_projection: {
-      "1_year": "3605",
-      "5_year": "4025",
-      trend: "up",
-      confidence: "medium",
-      notes:
-        "Projections based on historical performance of Toronto's residential market and anticipated economic stability, with moderate growth expected.",
-    },
-    nearby_food_grocery: [
-      "FreshCo (Sheppard & Markham)",
-      "Walmart Supercentre (Sheppard Ave E)",
-      "T&T Supermarket (Middlefield Rd)",
-    ],
-    nearby_schools: [
-      "Mary Ward Catholic Secondary School",
-      "Silver Springs Public School",
-      "Agincourt Junior Public School",
-    ],
+  const [predicted, setPredicted] = useState(null);
+  const [isFetching, setIsFetching] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
+
+  // prevents calling API every 150ms while still==true
+  const didFetchForCurrentStillRef = useRef(false);
+
+    const fetchPrediction = async () => {
+    if (coords.latitude == null || coords.longitude == null || heading == null) return;
+
+    setIsFetching(true);
+    setFetchError(null);
+
+    try {
+      const params = new URLSearchParams({
+        lat: String(coords.latitude),
+        lng: String(coords.longitude),
+        heading_deg: String(heading),
+        radius_m: "100",
+      });
+
+      const res = await fetch(`https://macathon.onrender.com/buildings/nearby?${params.toString()}`, {
+        method: "GET",
+        headers: { "Accept": "application/json" },
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`API ${res.status}: ${txt}`);
+      }
+
+      const data = await res.json();
+
+      // if your backend returns JSON as a string sometimes, handle it:
+      const parsed = typeof data === "string" ? JSON.parse(data) : data;
+
+      setPredicted(parsed);
+    } catch (e) {
+      console.error(e);
+      setFetchError(e.message || "Failed to fetch prediction");
+      setPredicted(null);
+    } finally {
+      setIsFetching(false);
+    }
   };
 
   // 📸 Start rear camera
@@ -251,6 +266,26 @@ const FullscreenCamera = () => {
     // 5️⃣ REMOVE 'orientation' from dependencies so the interval stays alive
   }, [isStarted, hasGpsFix, hasOrientationFix]);
 
+    useEffect(() => {
+    // when still becomes false again, allow a new fetch next time
+    if (!still) {
+      didFetchForCurrentStillRef.current = false;
+      return;
+    }
+
+    // only fetch once per still “session”
+    if (didFetchForCurrentStillRef.current) return;
+
+    // require usable inputs
+    if (!hasGpsFix || !hasOrientationFix) return;
+    if (coords.latitude == null || coords.longitude == null) return;
+    if (heading == null) return;
+
+    didFetchForCurrentStillRef.current = true;
+    fetchPrediction();
+  }, [still, hasGpsFix, hasOrientationFix, coords.latitude, coords.longitude, heading]);
+
+
 
 
   return (
@@ -280,22 +315,26 @@ const FullscreenCamera = () => {
           {/* 🏠 House Icon - Bottom Right */}
           {still && (
             <button
-              onClick={() => setShowInfo(true)}
+              onClick={() => {
+                setShowInfo(true);
+                // optional: if you want tap to force refresh
+                // fetchPrediction();
+              }}
               className="houseBtn"
             >
               🏠
             </button>
           )}
+
           <div className={still ? "showing" : "hidden"}>STILL!</div> {/*TESSTTTTTT!!!!!!!!!!!!!!!!!!!!!!! */}
 
           {/* 🪧 Property Info Panel - Slide Up */}
-          {showInfo && (
+                    {showInfo && (
             <div
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
               className="infoPanel"
             >
-              {/* Swipe indicator */}
               <div className="swipeHeader">
                 <div className="swipeBar" />
               </div>
@@ -303,53 +342,72 @@ const FullscreenCamera = () => {
               <div className="infoContent">
                 <div className="houseEmoji">🏠</div>
 
-                <h3 className="title">{predicted.building_name}</h3>
-                <p className="subtle">{predicted.location}</p>
+                {isFetching && <p className="subtle">Loading...</p>}
 
-                <div className="priceCard">
-                  <div className="priceType">{predicted.predicted_price_or_rent.type}</div>
-                  <div className="priceAmount">
-                    {predicted.predicted_price_or_rent.currency} ${predicted.predicted_price_or_rent.amount}
-                  </div>
-                  <div className="confidence">
-                    Confidence: {predicted.predicted_price_or_rent.confidence}
-                  </div>
-                </div>
+                {fetchError && (
+                  <p className="subtle" style={{ opacity: 0.9 }}>
+                    Error: {fetchError}
+                  </p>
+                )}
 
-                <p className="notes">{predicted.predicted_price_or_rent.notes}</p>
+                {!isFetching && !fetchError && !predicted && (
+                  <p className="subtle">No prediction yet. Hold still to scan.</p>
+                )}
 
-                <h3 className="sectionTitle">📈 Price Projection</h3>
-                <div className="sectionBlock">
-                  <div className="row"><strong>1 Year:</strong> ${predicted.future_price_projection["1_year"]}</div>
-                  <div className="row"><strong>5 Years:</strong> ${predicted.future_price_projection["5_year"]}</div>
-                  <div className="row">
-                    <strong>Trend:</strong> {predicted.future_price_projection.trend} (
-                    {predicted.future_price_projection.confidence})
-                  </div>
-                </div>
+                {!isFetching && !fetchError && predicted && (
+                  <>
+                    <h3 className="title">{predicted.building_name}</h3>
+                    <p className="subtle">{predicted.location}</p>
 
-                <p className="italicNote">{predicted.future_price_projection.notes}</p>
+                    <div className="priceCard">
+                      <div className="priceType">{predicted.predicted_price_or_rent?.type}</div>
+                      <div className="priceAmount">
+                        {predicted.predicted_price_or_rent?.currency} ${predicted.predicted_price_or_rent?.amount}
+                      </div>
+                      <div className="confidence">
+                        Confidence: {predicted.predicted_price_or_rent?.confidence}
+                      </div>
+                    </div>
 
-                <h3 className="sectionTitle">🛒 Nearby Grocery</h3>
-                <ul className="list">
-                  {predicted.nearby_food_grocery.map((store, i) => (
-                    <li key={i} className="listItem">{store}</li>
-                  ))}
-                </ul>
+                    <p className="notes">{predicted.predicted_price_or_rent?.notes}</p>
 
-                <h3 className="sectionTitle">🏫 Nearby Schools</h3>
-                <ul className="list">
-                  {predicted.nearby_schools.map((school, i) => (
-                    <li key={i} className="listItem">{school}</li>
-                  ))}
-                </ul>
+                    <h3 className="sectionTitle">📈 Price Projection</h3>
+                    <div className="sectionBlock">
+                      <div className="row">
+                        <strong>1 Year:</strong> ${predicted.future_price_projection?.["1_year"]}
+                      </div>
+                      <div className="row">
+                        <strong>5 Years:</strong> ${predicted.future_price_projection?.["5_year"]}
+                      </div>
+                      <div className="row">
+                        <strong>Trend:</strong> {predicted.future_price_projection?.trend} (
+                        {predicted.future_price_projection?.confidence})
+                      </div>
+                    </div>
 
-                <div className="footerHint">
-                  Swipe down to return to camera
-                </div>
+                    <p className="italicNote">{predicted.future_price_projection?.notes}</p>
+
+                    <h3 className="sectionTitle">🛒 Nearby Grocery</h3>
+                    <ul className="list">
+                      {(predicted.nearby_food_grocery || []).map((store, i) => (
+                        <li key={i} className="listItem">{store}</li>
+                      ))}
+                    </ul>
+
+                    <h3 className="sectionTitle">🏫 Nearby Schools</h3>
+                    <ul className="list">
+                      {(predicted.nearby_schools || []).map((school, i) => (
+                        <li key={i} className="listItem">{school}</li>
+                      ))}
+                    </ul>
+
+                    <div className="footerHint">Swipe down to return to camera</div>
+                  </>
+                )}
               </div>
             </div>
           )}
+
 
           {/* ℹ️ Info HUD */}
           <div className="hud">
