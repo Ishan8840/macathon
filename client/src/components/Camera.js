@@ -86,10 +86,10 @@ const FullscreenCamera = () => {
         setHasGpsFix(true); // ✅ we now have GPS data at least once
 
         setCoords({
-          latitude: position.coords.latitude.toFixed(6),
-          longitude: position.coords.longitude.toFixed(6),
-          accuracy: position.coords.accuracy.toFixed(2),
-          timestamp: new Date(position.timestamp).toLocaleTimeString(),
+          latitude: position.coords.latitude,   // ✅ keep as number
+          longitude: position.coords.longitude, // ✅ keep as number
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp,
         });
       },
       (err) => {
@@ -119,9 +119,9 @@ const FullscreenCamera = () => {
       }
 
       setOrientation({
-        alpha: event.alpha?.toFixed(1) ?? null,
-        beta: event.beta?.toFixed(1) ?? null,
-        gamma: event.gamma?.toFixed(1) ?? null,
+        alpha: event.alpha ?? null, // ✅ keep as number
+        beta: event.beta ?? null,
+        gamma: event.gamma ?? null,
       });
 
       // ✅ once we get our first non-null reading, we know the sensor is live
@@ -154,7 +154,7 @@ const FullscreenCamera = () => {
   };
 
   // 🏠 Show icon if heading is ~north (±10°)
-  const isFacingNorth = heading !== null && (heading <= 10 || heading >= 350);
+  // const isFacingNorth = heading !== null && (heading <= 10 || heading >= 350);
 
   // Handle swipe down to close popup
   const handleTouchStart = (e) => {
@@ -227,18 +227,17 @@ const FullscreenCamera = () => {
       const { latitude, longitude } = coords;
       const { alpha, beta, gamma } = orientation;
 
-      // reset baseline when tracking begins
-      lastValuesRef.current = { latitude: null, longitude: null, alpha: null, beta: null, gamma: null };
-      stillSinceRef.current = null;
-      setStill(false);
-      setStillMs(0);
-
-      // convert strings -> numbers (because toFixed returns strings)
-      const lat = Number(latitude);
-      const lng = Number(longitude);
-      const a = Number(alpha);
-      const b = Number(beta);
-      const g = Number(gamma);
+      // wait until all values exist
+      if (
+        latitude === null ||
+        longitude === null ||
+        alpha === null ||
+        beta === null ||
+        gamma === null
+      ) {
+        setStill(false); 
+        return;
+      }
 
       const last = lastValuesRef.current;
 
@@ -302,51 +301,51 @@ const FullscreenCamera = () => {
 
 
   return (
-    <div className="arRoot">
-      {/* Start AR Button */}
-      {!isStarted && (
-        <button onClick={() => setIsStarted(true)} className="startARBtn">
-          Start AR
-        </button>
-      )}
+  <div className="arRoot">
+    {/* Start AR Button */}
+    {!isStarted && (
+      <button onClick={() => setIsStarted(true)} className="startARBtn">
+        Start AR
+      </button>
+    )}
 
-      {/* All camera and UI elements - only show after start */}
-      {isStarted && (
-        <>
-          {/* 📷 Fullscreen Camera */}
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="cameraVideo"
-          />
+    {/* All camera and UI elements - only show after start */}
+    {isStarted && (
+      <>
+        {/* 📷 Fullscreen Camera */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="cameraVideo"
+        />
 
-          {/* 🔴 Red Dot Center */}
-          <div className="centerDot" />
+        {/* 🔴 Red Dot Center */}
+        <div className="centerDot" />
 
-          {/* 🏠 House Icon - Bottom Right */}
-          {isFacingNorth && (
-            <button
-              onClick={() => setShowInfo(true)}
-              className="houseBtn"
-            >
-              🏠
-            </button>
-          )}
-          <div className={still ? "showing" : "hidden"}>STILL!</div> {/*TESSTTTTTT!!!!!!!!!!!!!!!!!!!!!!!*/}
+        {/* 🏠 House Icon - Bottom Right */}
+        {still && (
+          <button
+            onClick={() => setShowInfo(true)}
+            className="houseBtn"
+          >
+            🏠
+          </button>
+        )}
+        {/* <div className={still ? "showing" : "hidden"}>STILL!</div> TESSTTTTTT!!!!!!!!!!!!!!!!!!!!!!! */}
 
-          {/* 🪧 Property Info Panel - Slide Up */}
-          {showInfo && (
-            <div
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-              className="infoPanel"
-            >
-              {/* Swipe indicator */}
-              <div className="swipeHeader">
-                <div className="swipeBar" />
-              </div>
+        {/* 🪧 Property Info Panel - Slide Up */}
+        {showInfo && (
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            className="infoPanel"
+          >
+            {/* Swipe indicator */}
+            <div className="swipeHeader">
+              <div className="swipeBar" />
+            </div>
 
               <div className="infoContent">
                 <div className="houseEmoji">🏠</div>
