@@ -457,9 +457,6 @@ const FullscreenCamera = () => {
                           ? `${predicted.distance.estimated_time_minutes} min walk`
                           : "N/A"}
                       </div>
-                      <div className="row">
-                        <strong>Confidence:</strong> {predicted.distance?.confidence || "N/A"}
-                      </div>
                     </div>
                     {predicted.distance?.notes && <p className="italicNote">{predicted.distance.notes}</p>}
 
@@ -473,15 +470,6 @@ const FullscreenCamera = () => {
                         {predicted.nearby_bus_stop?.distance_m
                           ? `${predicted.nearby_bus_stop.distance_m} m`
                           : "N/A"}
-                      </div>
-                      <div className="row">
-                        <strong>Routes:</strong>{" "}
-                        {(predicted.nearby_bus_stop?.routes || []).length
-                          ? predicted.nearby_bus_stop.routes.join(", ")
-                          : "N/A"}
-                      </div>
-                      <div className="row">
-                        <strong>Confidence:</strong> {predicted.nearby_bus_stop?.confidence || "N/A"}
                       </div>
                     </div>
                     {predicted.nearby_bus_stop?.notes && <p className="italicNote">{predicted.nearby_bus_stop.notes}</p>}

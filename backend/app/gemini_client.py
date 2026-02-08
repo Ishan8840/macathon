@@ -33,7 +33,6 @@ def generate_summary(location: dict):
         },
         "nearby_bus_stop": {
             "name": "",
-            "routes": [],
             "distance_m": "",
             "confidence": "low|medium|high",
             "notes": ""
