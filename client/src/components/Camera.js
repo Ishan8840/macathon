@@ -304,7 +304,6 @@ const FullscreenCamera = () => {
           setStill(false);
         } else if (now - stillSinceRef.current >= STILL_REQUIRED_MS) {
           setStill(true);
-          fetchNearbyBuildings();
         }
       }
 
