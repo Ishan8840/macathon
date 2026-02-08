@@ -183,38 +183,16 @@ const FullscreenCamera = () => {
   // require 2 seconds of stillness
   const STILL_REQUIRED_MS = 2000;
 
-  // optional cooldown so it doesn't spam while you keep holding still
-  const COOLDOWN_MS = 2500;
-
   // store previous values
-  const lastValuesRef = useRef({
-    latitude: null,
-    longitude: null,
-    alpha: null,
-    beta: null,
-    gamma: null,
-  });
+  const lastValuesRef = useRef(null);
 
   const stillSinceRef = useRef(null);
-  const lastTriggerRef = useRef(0);
 
   // ✅ circular difference for 0-360 angles (handles 359 -> 1 as 2 degrees)
   const angleDiff360 = (a, b) => {
     const diff = Math.abs(a - b);
     return Math.min(diff, 360 - diff);
   };
-
-  const onStillFor2Seconds = useCallback(() => {
-    console.log("✅ Still for 2 seconds. Trigger API call here.", {
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      heading,
-      alpha: orientation.alpha,
-      beta: orientation.beta,
-      gamma: orientation.gamma,
-      time: new Date().toISOString(),
-    });
-  }, [coords.latitude, coords.longitude, heading, orientation.alpha, orientation.beta, orientation.gamma]);
 
   useEffect(() => {
     if (!isStarted) return;
@@ -226,74 +204,63 @@ const FullscreenCamera = () => {
       const { latitude, longitude } = coords;
       const { alpha, beta, gamma } = orientation;
 
-      // these should exist now, but guard anyway
-      if (latitude == null || longitude == null || alpha == null || beta == null || gamma == null) {
+      // wait until all values exist
+      if (
+        latitude == null ||
+        longitude == null ||
+        alpha == null ||
+        beta == null ||
+        gamma == null
+      ) {
         stillSinceRef.current = null;
         setStill(false);
         return;
       }
 
-      // convert strings -> numbers (because toFixed returns strings)
-      const lat = Number(latitude);
-      const lng = Number(longitude);
-      const a = Number(alpha);
-      const b = Number(beta);
-      const g = Number(gamma);
-
+      const current = { latitude, longitude, alpha, beta, gamma };
       const last = lastValuesRef.current;
 
-      // first run setup
-      if (last.latitude === null) {
-        lastValuesRef.current = { latitude: lat, longitude: lng, alpha: a, beta: b, gamma: g };
+      // first run → set baseline only
+      if (!last) {
+        lastValuesRef.current = current;
         stillSinceRef.current = null;
         setStill(false);
         return;
       }
 
       const gpsMoved =
-        Math.abs(lat - last.latitude) > GPS_THRESHOLD ||
-        Math.abs(lng - last.longitude) > GPS_THRESHOLD;
+        Math.abs(latitude - last.latitude) > GPS_THRESHOLD ||
+        Math.abs(longitude - last.longitude) > GPS_THRESHOLD;
 
       const orientationMoved =
-        angleDiff360(a, last.alpha) > ORIENTATION_THRESHOLD ||
-        Math.abs(b - last.beta) > ORIENTATION_THRESHOLD ||
-        Math.abs(g - last.gamma) > ORIENTATION_THRESHOLD;
-
-      // update baseline for next tick
-      lastValuesRef.current = { latitude: lat, longitude: lng, alpha: a, beta: b, gamma: g };
+        angleDiff360(alpha, last.alpha) > ORIENTATION_THRESHOLD ||
+        Math.abs(beta - last.beta) > ORIENTATION_THRESHOLD ||
+        Math.abs(gamma - last.gamma) > ORIENTATION_THRESHOLD;
 
       const moved = gpsMoved || orientationMoved;
       const now = Date.now();
 
       if (moved) {
-        // reset stillness timer
         stillSinceRef.current = null;
         setStill(false);
-        return;
+      } else {
+        if (stillSinceRef.current === null) {
+          stillSinceRef.current = now; // start timer
+          setStill(false);
+        } else {
+          const duration = now - stillSinceRef.current;
+          if (duration >= STILL_REQUIRED_MS) {
+            setStill(true);
+          }
+        }
       }
 
-      // still this tick: start timer if needed
-      if (stillSinceRef.current === null) {
-        stillSinceRef.current = now;
-        setStill(false);
-        return;
-      }
-
-      const duration = now - stillSinceRef.current;
-
-      const isStillFor2s = duration >= STILL_REQUIRED_MS;
-      setStill(isStillFor2s);
-
-      // trigger once per cooldown while still
-      const sinceLastTrigger = now - lastTriggerRef.current;
-      if (isStillFor2s && sinceLastTrigger >= COOLDOWN_MS) {
-        lastTriggerRef.current = now;
-        onStillFor2Seconds();
-      }
+      // update baseline
+      lastValuesRef.current = current;
     }, CHECK_EVERY_MS);
 
     return () => clearInterval(intervalId);
-  }, [isStarted, hasGpsFix, orientationEnabled, hasOrientationFix, coords, orientation, heading, onStillFor2Seconds]);
+  }, [isStarted, coords, orientation]);
 
 
 
@@ -330,7 +297,7 @@ const FullscreenCamera = () => {
               🏠
             </button>
           )}
-          {/* <div className={still ? "showing" : "hidden"}>STILL!</div> TESSTTTTTT!!!!!!!!!!!!!!!!!!!!!!! */}
+          <div className={still ? "showing" : "hidden"}>STILL!</div> {/*TESSTTTTTT!!!!!!!!!!!!!!!!!!!!!!! */}
 
           {/* 🪧 Property Info Panel - Slide Up */}
           {showInfo && (
